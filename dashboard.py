@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
+from sklearn.cluster import KMeans
 
 # Mengatur style seaborn
 sns.set(style='dark')
@@ -67,3 +68,45 @@ if scatter_columns.issubset(all_df.columns):
     st.pyplot(fig)
 else:
     st.error(f"Kolom 'WSPM', 'wd', atau '{selected_scatter_polusi}' tidak ditemukan dalam dataset!")
+
+# Membuat data clustering menggunakan K-Means
+@st.cache_data 
+def load_data(): 
+    return pd.read_csv("airdata.csv")  #Panggil dataset
+
+airdata = load_data() #Load dataset airdata
+
+# Hitung rata-rata polusi per stasiun menggunakan mean
+station_avg = airdata.groupby('station').agg({
+    "PM2.5": "mean",
+    "PM10": "mean",
+    "NO2": "mean",
+    "CO": "mean",
+    "O3": "mean"
+}).reset_index()
+
+#Menerapkan  K-Means dengan 3 cluster yaitu 0,1,2 beradasrkan stasiun
+kmeans = KMeans(n_clusters=3, random_state=42) 
+station_avg['cluster'] = kmeans.fit_predict(station_avg.iloc[:, 1:]) 
+
+# Menampilkan hasil dalam tabel di Streamlit supaya lebih interaktif dengan memilih cluster 
+
+st.subheader("📍 Stasiun Berdasarkan Cluster") 
+selected_cluster = st.selectbox("Pilih Cluster:", [0, 1, 2]) 
+
+st.dataframe(station_avg[station_avg['cluster'] == selected_cluster]) 
+
+# Menampilkan visualisasi hasil clustering 
+
+st.subheader("📊 Visualisasi Clustering Stasiun") 
+
+fig, ax = plt.subplots(figsize=(10, 5)) 
+sns.scatterplot(x="PM2.5", y="PM10", hue=station_avg['cluster'], data=station_avg, palette="deep", ax=ax) 
+ax.set_title("Clustering Stasiun Pemantauan berdasarkan Konsentrasi Polutan") 
+ax.set_xlabel("Rata-rata PM2.5") 
+ax.set_ylabel("Rata-rata PM10") 
+st.pyplot(fig) 
+
+# Menampilkan jumlah stasiun per cluster  
+st.subheader("📈 Jumlah Stasiun perCluster")  
+st.bar_chart(station_avg['cluster'].value_counts())  
